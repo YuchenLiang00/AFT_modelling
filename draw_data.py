@@ -5,7 +5,7 @@ def get_sample():
     data_path = input("set your data path (eg. '../../train'): ")
     data = pd.DataFrame()
     for file in os.listdir(data_path):
-        if ("sym0" in file or "sym0" in file) and ("date0" in file or "date10" in file):
+        if ("sym0" in file or "sym1" in file) and ("date0" in file or "date10" in file):
             csv_path = os.path.join(data_path, file)
             sub_data = pd.read_csv(csv_path, index_col=0)
             data = pd.concat([data, sub_data])
