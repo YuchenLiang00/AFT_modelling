@@ -2,7 +2,7 @@ import pandas as pd
 import os
 
 def get_sample():
-    data_path = input("set your data path (eg. '../../train'): ")
+    data_path = './AI量化模型预测挑战赛公开数据/train'
     data = pd.DataFrame()
     for file in os.listdir(data_path):
         if ("sym0" in file or "sym1" in file) and ("date0" in file or "date10" in file):
