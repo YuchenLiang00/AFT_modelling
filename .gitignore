@@ -2,3 +2,5 @@
 /AI量化模型预测挑战赛公开数据
 *.csv
 draw_data.py
+*.pickle
+*.pkl
