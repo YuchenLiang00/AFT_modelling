@@ -4,3 +4,5 @@
 draw_data.py
 *.pickle
 *.pkl
+*.npz
+*.npy
