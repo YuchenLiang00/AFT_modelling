@@ -1,6 +1,6 @@
 import pandas as pd
 import numpy as np
-from compress import reduce_mem_usage
+from moduals.compress import reduce_mem_usage
 import os
 import time
 from tqdm import tqdm
@@ -22,7 +22,6 @@ def combine_data(file_path: str = None) -> bool:
 
 
 def compress_data(df) -> str:
-
     # modify the time series from str to float
     if df['time'].dtype == 'object':
         df['time'] = df['time'].apply(
@@ -37,21 +36,23 @@ def compress_data(df) -> str:
 
 def export_data(df: pd.DataFrame, is_Train: bool = True)->bool:
     if is_Train is True:
-            
-        # write into pickle file
+        # write into npy file
         labels = ['label_5', 'label_10', 'label_20', 'label_40', 'label_60']
         features = list(set(df.columns.to_list()) - set(labels))
 
-        np.save('train_data.npy',df[features].to_numpy())
-        np.save('train_labels.npy', df[labels].to_numpy())
-
+        np.save('train_data.npy', df[features].to_numpy())
+        # One-Hot the labels
+        # for label in labels:
+        #     df_label = pd.get_dummies(df[label])
+        #     np.save(f'train_labels_{label}.npy', df_label.to_numpy(dtype=np.int64))
+        np.save('train_labels.npy', df[labels].to_numpy(np.int64))
         return True
     elif is_Train is False:
         # TODO: get test dataset
         pass
-    
+
     return False
-    
+
 if __name__ == '__main__':
     data = pd.read_csv('input_sample.csv')
     export_data(compress_data(data))
