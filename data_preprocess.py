@@ -1,6 +1,6 @@
 import pandas as pd
 import numpy as np
-from moduals.compress import reduce_mem_usage
+from modules.compress import reduce_mem_usage
 import os
 import time
 from tqdm import tqdm
