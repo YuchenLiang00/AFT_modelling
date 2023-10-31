@@ -74,7 +74,7 @@ class EncoderLayer(nn.Module):
 
     def __init__(self, d_model, num_heads):
         super(EncoderLayer, self).__init__()
-        self.attention = nn.MultiheadAttention(d_model, num_heads) # TODO mask
+        self.attention = nn.MultiheadAttention(d_model, num_heads)
         self.feedforward = nn.Sequential(nn.Linear(d_model, 4 * d_model),
                                          nn.ReLU(),
                                          nn.Linear(4 * d_model, d_model))
@@ -94,7 +94,7 @@ class DecoderLayer(nn.Module):
 
     def __init__(self, d_model, num_heads):
         super(DecoderLayer, self).__init__()
-        self.self_attention = nn.MultiheadAttention(d_model, num_heads)
+        self.self_attention = nn.MultiheadAttention(d_model, num_heads)  # TODO mask
         self.encoder_attention = nn.MultiheadAttention(d_model, num_heads)
         self.feedforward = nn.Sequential(nn.Linear(d_model, 4 * d_model),
                                          nn.ReLU(),
@@ -124,7 +124,7 @@ class Transformer(nn.Module):
         self.config = config
         self.pe = PositionalEncoding(config['hidden_dim'], config['dropout'])
         self.input_layer = nn.Linear(config['input_dim'], config['hidden_dim'])
-        # TODO: Embedding
+        
         self.encoder_layers = nn.ModuleList([
             EncoderLayer(config['hidden_dim'], config['num_heads'])
             for _ in range(config['num_layers'])
@@ -139,7 +139,7 @@ class Transformer(nn.Module):
 
         # Input layer
         x = self.input_layer(x)
-        x = self.pe(x) if self.config['pe'] is True else x
+        x = self.pe(x) if self.config['pos_enco'] is True else x
 
         # Encoder layers
         # encoder_output = x.transpose(0, 1)
@@ -162,7 +162,7 @@ class TransformerClassifier(nn.Module):
     def __init__(self, config:dict,):
         super(TransformerClassifier, self).__init__()
 
-        self.embedding = nn.Embedding(config['input_dim'], config['hidden_dim'])
+        # self.embedding = nn.Embedding(config['input_dim'], config['hidden_dim'])
         self.transformer = nn.Transformer(
             d_model=config['hidden_dim'],
             num_encoder_layers=config['num_layers'],
@@ -173,8 +173,8 @@ class TransformerClassifier(nn.Module):
         self.fc = nn.Linear(config['hidden_dim'], config['output_dim'])
 
     def forward(self, X):
-        embedded = self.embedding(X)
-        transformed = self.transformer(embedded)
+        # embedded = self.embedding(X)
+        transformed = self.transformer(X)
         logits = self.fc(transformed)
         return logits
 

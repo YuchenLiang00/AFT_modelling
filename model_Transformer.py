@@ -4,54 +4,12 @@ import torch
 import matplotlib.pyplot as plt
 import time
 from torch import nn
-from torch.utils.data import Dataset, DataLoader
+
 from tqdm import tqdm
 
 from modules.transformer import Transformer
 from modules.config import config
-
-
-class LOBDataset(Dataset):
-
-    def __init__(self, data: torch.tensor, labels:torch.tensor) -> None:
-        super().__init__()
-        # if is_train is True:
-        self.data = data
-        self.labels = labels
-        
-
-    def __len__(self) -> int:
-        return self.labels.shape[0]
-
-    def __getitem__(self, index) -> tuple[torch.tensor, torch.tensor]:
-        # TODO 要对取数据的操作做详细的处理。
-        # 包括sym,date, time的细致处理
-        return self.data[index], self.labels[index].long()
-
-    # TODO: 划分训练集和测试集
-
-
-def get_dataloader(batch_size:int, 
-                   train_ratio:float, 
-                   label_idx: int = 0, # 需要预测的标签序号，这里先预测label_5的
-                  )->tuple[DataLoader, DataLoader]:
-    '''read data from file and return a tuple of DataLoader'''
-    data_dir = config['data_dir']
-    label_dir = config['label_dir']
-
-    data: torch.tensor = torch.from_numpy(np.load(data_dir))
-    labels: torch.tensor = torch.from_numpy(np.load(label_dir))
-    # TODO 暴力切一刀是有问题的
-    # 将切分Valid 和Train 放到LOBDataset外面来实现，可以尽可能地减小LOBDataset的大小
-    train_data = data[:round(train_ratio * data.shape[0])]
-    train_labels = labels[:round(train_ratio * data.shape[0]),label_idx]
-
-    valid_data = data[round(train_ratio * data.shape[0]):]
-    valid_labels = labels[round(train_ratio * data.shape[0]):,label_idx]
-
-    train_iter = DataLoader(LOBDataset(train_data, train_labels), batch_size=batch_size, shuffle=False)
-    valid_iter = DataLoader(LOBDataset(valid_data, valid_labels), batch_size=batch_size, shuffle=False)
-    return train_iter, valid_iter
+from modules.dataset import *
 
 
 def initialize_weight(x):
@@ -69,6 +27,7 @@ def plot_loss(train_losses: list, valid_losses: list, output_path: str):
     ax.plot(train_losses)
     ax.plot(valid_losses)
     ax.legend(['train_loss', 'test_loss'])
+    ax.set_title('Losses of Train and Valid')
     plt.xlabel('epochs')
     plt.ylabel('loss')
     plt.xlim(1, len(train_losses))
