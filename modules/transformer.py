@@ -1,4 +1,5 @@
 import torch
+import math
 from torch import nn
 # TODO
 '''
@@ -10,21 +11,19 @@ allowing it to capture some stock-specific nuances.
 
 class PositionalEncoding(nn.Module):
 
-    def __init__(self, num_hiddens, dropout, max_len=1000):
+    def __init__(self, d_model, dropout, max_len=1000):
         super(PositionalEncoding, self).__init__()
         self.dropout = nn.Dropout(dropout)
         # 创建⼀个⾜够⻓的P
-        self.P = torch.zeros((1, max_len, num_hiddens))
-        X = torch.arange(max_len,
-                        dtype=torch.float32).reshape(-1, 1) / torch.pow(10000,
-                        torch.arange(0, num_hiddens, 2,
-                                     dtype=torch.float32) / num_hiddens)
-        
-        self.P[:, :, 0::2] = torch.sin(X)
-        self.P[:, :, 1::2] = torch.cos(X)
+        self.pe = torch.zeros(1, max_len, d_model)
+        position = torch.arange(0, max_len, dtype=torch.float).unsqueeze(1)
+        div_term = torch.exp(torch.arange(0, d_model, 2).float() * (-math.log(10000.0) / d_model))
+        X = position * div_term
+        self.pe[:, :, 0::2] = torch.sin(X)
+        self.pe[:, :, 1::2] = torch.cos(X)
 
     def forward(self, X):
-        X = X + self.P[:, :X.shape[1], :].to(X.device)
+        X = X + self.pe[:, :X.shape[1], :].to(X.device)
         return self.dropout(X)
 
 
@@ -159,24 +158,38 @@ class Transformer(nn.Module):
 
 
 class TransformerClassifier(nn.Module):
-    def __init__(self, config:dict,):
-        super(TransformerClassifier, self).__init__()
+    """
+    TransformerClassifier 的输入维度应该是(batch_size, seq_len, embed_size)
+    在我们的例子中 embed_size 就是 feature_size
+    """
 
-        # self.embedding = nn.Embedding(config['input_dim'], config['hidden_dim'])
-        self.transformer = nn.Transformer(
-            d_model=config['hidden_dim'],
-            num_encoder_layers=config['num_layers'],
-            num_decoder_layers=config['num_layers'],
-            nhead=config['num_heads'],
-            dim_feedforward=config['hidden_dim'],
-            dropout=config['dropout'])
-        self.fc = nn.Linear(config['hidden_dim'], config['output_dim'])
+    def __init__(self, config:dict):
+        super(TransformerClassifier, self).__init__()
+        self.config = config
+        self.pe = PositionalEncoding(config['hidden_dim'], config['dropout'])
+        self.encoder_layers = nn.ModuleList([
+            EncoderLayer(config['hidden_dim'], config['num_heads'])
+            for _ in range(config['num_layers'])
+        ])
+
+        self.fc = nn.Linear(config['hidden_dim'] * config['seq_len'], config['output_dim'])
 
     def forward(self, X):
-        # embedded = self.embedding(X)
-        transformed = self.transformer(X)
-        logits = self.fc(transformed)
-        return logits
+
+        # Positional Encoding
+        # X (batch_size, seq_len, feature_size)
+        X = self.pe(X) if self.config['pos_enco'] is True else X
+
+        # Encoder layers
+        encoder_output = X  # 不会产生copy
+        for layer in self.encoder_layers:
+            encoder_output = layer(encoder_output)
+        # encoder_output (batch_size, seq_len, hidden_size=embed_size=feature_size)
+
+        # Output layer
+        output = self.fc(encoder_output.flatten(start_dim=1)) # 将seq_len, feature_size展平
+        # output (batch_size, class_num),在本例中，class_num = 3
+        return output
 
 
 if __name__ == '__main__':
