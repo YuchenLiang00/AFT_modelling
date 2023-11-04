@@ -1,7 +1,7 @@
 import torch
 import math
 from torch import nn
-# TODO
+
 '''
 Stock Embeddings: If using a single model, 
 consider adding an embedding layer for stock identifiers.
