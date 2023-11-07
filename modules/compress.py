@@ -5,13 +5,12 @@ import os
 from tqdm import tqdm
 
 
-def reduce_mem_usage(df, if_copy:bool = False) -> pd.DataFrame:
+def reduce_mem_usage(df: pd.DataFrame) -> pd.DataFrame:
     """
     压缩内存函数,文件大小没变化,占用内存减小
     """
-    df = df.copy() if if_copy is True else df
     start_mem = df.memory_usage().sum() / 1024**2
-    for col in tqdm(df.columns):
+    for col in tqdm(df.columns,'Compressing...'):
         col_type = df[col].dtypes
         if str(col_type)[:5] == 'float':
             # convert all float64 into float16

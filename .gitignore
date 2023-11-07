@@ -1,3 +1,4 @@
+__pycache__
 /files
 /AI量化模型预测挑战赛公开数据
 /data
@@ -6,4 +7,5 @@
 *.pkl
 *.npz
 *.npy
+*.parquet
 draw_data.py

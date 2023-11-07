@@ -1,3 +1,5 @@
+from typing import Callable
+from numpy import record
 from torch import nn
 import matplotlib.pyplot as plt
 

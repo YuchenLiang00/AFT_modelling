@@ -1,11 +1,9 @@
 config: dict = {
     'device': 'mps',
-    'data_dir': './data/train_data.npy',
-    'label_dir': './data/train_labels.npy',
-    'batch_size': 10,  # 在本题中要动态变化
     'seq_len': 600,  # 这是最重要的指标之一
     'train_days': 48,
     'hidden_dim': 22,  # = embed_size（自注意力） = feature_size（本题无需embedding）
+    'daily_secs':3998,
     'dropout': .1,
     'output_dim': 3,
     'num_heads': 2,  
@@ -14,8 +12,7 @@ config: dict = {
     'lr': 2 * 1e-5,
     'num_epochs': 10,
     'model_path': './transformer_models/label_5',
-    'daily_secs':3998,
-    
+    'figure_output_path': './figure/Figure1.png'
 }
 
 '''
