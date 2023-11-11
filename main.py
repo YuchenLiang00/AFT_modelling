@@ -22,7 +22,7 @@ def train(model: nn.Module,
 
     print(
         f'On {config["device"]} : {count_parameters(model)} parameters to train...')
-
+    model.apply(initialize_weight)
     train_losses = []
     valid_losses = []
     best_valid_loss = 1e10
