@@ -48,7 +48,7 @@ class LOBDataset(Dataset):
 
         present_sym_start_index: int = sum(list(self.daily_sym_num_dict.values())[:cur_day]) # 不包含currday
         # FIXME DataLoader要求每次传进去的tensor的shape是一样的。但是这样取很明显会不一样
-        # TODO Transformer真的关注时序信息吗？我们可不可以把所有的股票在时间上拼起来直接遍历？
+        # Transformer真的关注时序信息吗？我们可不可以把所有的股票在时间上拼起来直接遍历？ ：可以
         X = self.data[present_sym_start_index:present_sym_start_index + cur_day_sym_num,
                         cur_sec,
                         :]
@@ -65,7 +65,7 @@ class LOBDataset(Dataset):
         start_sec *= self.stride  # 步长参数
         end_sec = start_sec + self.seq_len
         X = self.data[stock_id, start_sec:end_sec, :]
-        y = self.label[stock_id, end_sec]  # 这里的0表示以label_5为预测对象
+        y = self.label[stock_id, end_sec - 1]  # 这里的0表示以label_5为预测对象
         return X, y
 
 
@@ -121,8 +121,6 @@ class DataIterable:
 
 
 # Hints from GPT4
-
-
 class LargeCSVDataset(Dataset):
     def __init__(self, csv_file, chunk_size=1000):
         self.csv_file = csv_file
