@@ -9,3 +9,4 @@ __pycache__
 *.npy
 *.parquet
 draw_data.py
+lqz_dataset.py

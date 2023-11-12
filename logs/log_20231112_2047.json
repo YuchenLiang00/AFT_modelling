@@ -1,0 +1,33 @@
+{
+    "train_losses": [
+        NaN,
+        NaN
+    ],
+    "valid_losses": [
+        NaN,
+        NaN
+    ],
+    "mem_usage": {
+        "1": 4410.1875,
+        "2": 4413.75
+    },
+    "config": {
+        "device": "mps",
+        "seq_len": 600,
+        "stride": 300,
+        "batch_size": 8,
+        "train_days": 50,
+        "hidden_dim": 426,
+        "daily_secs": 3998,
+        "dropout": 0.1,
+        "output_dim": 3,
+        "num_heads": 2,
+        "num_layers": 2,
+        "pos_enco": true,
+        "lr": 2e-05,
+        "num_epochs": 2,
+        "model_path": "./transformer_models/label_5"
+    },
+    "time_cost": -490.63969802856445,
+    "time": "20231112_2047"
+}
