@@ -72,9 +72,10 @@ def train(model: nn.Module,
             torch.save(model, config['model_path'])
         # Record memory usage
         mem_usage[epoch+1] = process.memory_full_info().uss / (1024 * 1024)
-        print(f"\nepoch:{epoch+1}, Mem Usage: {mem_usage[epoch+1]:.2f}, MB.")
+        # print(f"\nepoch:{epoch+1}, Mem Usage: {mem_usage[epoch+1]:.2f}, MB.")
+
         print(f"GPU Sleeping...")
-        # time.sleep(300)  # Protect the GPU from over heating
+        time.sleep(300)  # Protect the GPU from over heating
 
     t2 = time.time() - 300 * config['num_epochs']
     elapsed_time = (t2 - t1) / 60
