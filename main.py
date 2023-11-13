@@ -6,7 +6,6 @@ import os
 from torch import nn
 from tqdm import tqdm
 from torch.utils.data import DataLoader
-from typing import Iterator
 # -- Personal Modules -- 
 from modules.transformer import TransformerClassifier
 from modules.config import config
@@ -19,16 +18,16 @@ def train(model: nn.Module,
           loss,
           optimizer,
           config: dict):
-
-    print(f'On {config["device"]} : {count_parameters(model)} parameters to train...')
-    model.apply(initialize_weight)
+    num_params = count_parameters(model)
+    print(f'On {config["device"]} : {num_params} parameters to train...')
     train_losses = []
     valid_losses = []
     best_valid_loss = 1e10
-    t1 = time.time()
     mem_usage = dict()
-
     process = psutil.Process(os.getpid())
+
+    t1 = time.time()
+
     for epoch in tqdm(range(config['num_epochs']), desc='Epochs'):
         # training
         model.train()  # Turn on the Training Mode
@@ -70,36 +69,44 @@ def train(model: nn.Module,
         if valid_loss < best_valid_loss:
             best_valid_loss = valid_loss
             torch.save(model, config['model_path'])
+            torch.save(optimizer.state_dict(),config['optimizer_path'])
         # Record memory usage
         mem_usage[epoch+1] = process.memory_full_info().uss / (1024 * 1024)
         # print(f"\nepoch:{epoch+1}, Mem Usage: {mem_usage[epoch+1]:.2f}, MB.")
 
-        print(f"GPU Sleeping...")
+        print(f"\nGPU Sleeping...")
         time.sleep(300)  # Protect the GPU from over heating
 
     t2 = time.time() - 300 * config['num_epochs']
     elapsed_time = (t2 - t1) / 60
-    save_log(train_losses=train_losses, 
+    save_log(train_losses=train_losses,
+             num_params=num_params,
              valid_losses=valid_losses,
              mem_usage=mem_usage,
              config=config,
-             time_cost=elapsed_time)
+             time_cost_mins=elapsed_time)
 
     print(f'Training Finished with Best Valid Loss: {best_valid_loss:.3f}')
-    print(f'Total Time Cost in Training: {elapsed_time:.2f} mins.')
+    print(f'Total Time Cost: {elapsed_time:.2f} mins.')
 
-    plot_loss(train_losses, valid_losses,)
+    plot_loss(train_losses, valid_losses)
 
     return True
 
 
 def train_Transformer() -> bool:
     train_iter = DataLoader(LOBDataset(is_train=True, config=config), 
-                            shuffle=False, batch_size=config['batch_size'])
+                            shuffle=True, batch_size=config['batch_size'])
     valid_iter = DataLoader(LOBDataset(is_train=False, config=config), 
                             shuffle=False, batch_size=config['batch_size'])
 
-    model = TransformerClassifier(config).to(config['device'])
+    # 如果是从头开始训练，则需要初始化，但是如果model是load进来的，则一定要去掉这句话。
+    # model = TransformerClassifier(config).to(config['device'])
+    # model.apply(initialize_weight)  
+
+    # load 模型重新训练
+    model = torch.load('./transformer_models/model_round_1').to(config['device'])
+    # optimizer = torch.optim.SGD().load_state_dict(config['optimizer_path'])
     loss = nn.CrossEntropyLoss()
     optimizer = torch.optim.SGD(model.parameters(), lr=config['lr'])
 
@@ -109,10 +116,6 @@ def train_Transformer() -> bool:
 
 if __name__ == '__main__':
 
-    """ 
-    train_iter = DataIterable('./data/train_data.npy','./data/train_labels.npy', is_train=True)
-    valid_iter = DataIterable('./data/valid_data.npy','./data/valid_labels.npy', is_train=False)
-    """
     train_Transformer()
     # model = TransformerClassifier(config)
     # print(model)
