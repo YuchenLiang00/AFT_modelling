@@ -33,7 +33,7 @@ class LOBDataset(Dataset):
         self.label = self.label[:, :, pred_label]
         # self.acc_sym_num: np.ndarray = np.load('./data/cum_sym_num_dict.npy')
         self.seq_len = config['seq_len']
-        self.stride = config['stride']
+        self.stride = config['stride'] if is_train is True else 1  # valid 的时候还是一步一步来
         self.training_days = config['train_days'] if is_train is True else 64 - config['train_days']
 
     def __len__(self) -> int:
