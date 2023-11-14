@@ -6,7 +6,7 @@ import os
 from torch import nn
 from tqdm import tqdm
 from torch.utils.data import DataLoader
-# -- Personal Modules -- 
+# -- Personal Modules --
 from modules.transformer import TransformerClassifier
 from modules.config import config
 from dataset import LOBDataset
@@ -22,6 +22,8 @@ def train(model: nn.Module,
     print(f'On {config["device"]} : {num_params} parameters to train...')
     train_losses = []
     valid_losses = []
+    train_accs = []
+    valid_accs = []
     best_valid_loss = 1e10
     mem_usage = dict()
     process = psutil.Process(os.getpid())
@@ -32,9 +34,8 @@ def train(model: nn.Module,
         # training
         model.train()  # Turn on the Training Mode
         epoch_train_loss = []
-
+        epoch_train_acc = []
         for X, y in tqdm(train_loader, desc='Processing Train'):
-
             X = X.to(config['device'])
             y = y.to(config['device'])  # 只要一个标签就可以
             # Compute prediction error
@@ -44,32 +45,42 @@ def train(model: nn.Module,
             # Backpropagation
             l.backward()
             optimizer.step()
+
+            _, y_hat = torch.max(pred, dim=1)
+            epoch_train_acc.append((sum(y_hat == y) / len(y)).item())
             epoch_train_loss.append(l.item())
 
         train_loss = sum(epoch_train_loss) / len(epoch_train_loss)
+        train_acc = sum(epoch_train_acc) / len(epoch_train_acc)
         train_losses.append(train_loss)
+        train_accs.append(train_acc)
 
         # validation
         model.eval()  # Trun on the Evaluation Mode
         epoch_valid_loss = []
+        epoch_valid_acc = []
         for X, y in tqdm(valid_loader, 'Processing Valid'):
 
             # X, y = X.to(config['device']), y.to(config['device'])
-            X, y = X.to(
-                config['device']), y.to(config['device'])
+            X = X.to(config['device'])
+            y = y.to(config['device'])
             # Compute prediction error
             with torch.no_grad():
                 pred = model(X)
-            l = loss(pred, y)
-            epoch_valid_loss.append(l.item())
+                l = loss(pred, y)
+                epoch_valid_loss.append(l.item())
+                _, y_hat = torch.max(pred, dim=1)
+                epoch_valid_acc.append((sum(y_hat == y) / len(y)).item())
 
         valid_loss = sum(epoch_valid_loss) / len(epoch_valid_loss)
         valid_losses.append(valid_loss)
+        valid_acc = sum(epoch_valid_acc) / len(epoch_valid_acc)
+        valid_accs.append(valid_acc)
 
         if valid_loss < best_valid_loss:
             best_valid_loss = valid_loss
             torch.save(model, config['model_path'])
-            torch.save(optimizer.state_dict(),config['optimizer_path'])
+            torch.save(optimizer.state_dict(), config['optimizer_path'])
         # Record memory usage
         mem_usage[epoch+1] = process.memory_full_info().uss / (1024 * 1024)
         # print(f"\nepoch:{epoch+1}, Mem Usage: {mem_usage[epoch+1]:.2f}, MB.")
@@ -89,23 +100,25 @@ def train(model: nn.Module,
     print(f'Training Finished with Best Valid Loss: {best_valid_loss:.3f}')
     print(f'Total Time Cost: {elapsed_time:.2f} mins.')
 
-    plot_loss(train_losses, valid_losses)
+    plot_loss(train_losses, valid_losses, train_accs,
+              valid_accs)  # TODO绘制测试精度！！！！！
 
     return True
 
 
 def train_Transformer() -> bool:
-    train_iter = DataLoader(LOBDataset(is_train=True, config=config), 
+    train_iter = DataLoader(LOBDataset(is_train=True, config=config),
                             shuffle=True, batch_size=config['batch_size'])
-    valid_iter = DataLoader(LOBDataset(is_train=False, config=config), 
+    valid_iter = DataLoader(LOBDataset(is_train=False, config=config),
                             shuffle=False, batch_size=config['batch_size'])
 
     # 如果是从头开始训练，则需要初始化，但是如果model是load进来的，则一定要去掉这句话。
     # model = TransformerClassifier(config).to(config['device'])
-    # model.apply(initialize_weight)  
+    # model.apply(initialize_weight)
 
     # load 模型重新训练
-    model = torch.load('./transformer_models/model_round_1').to(config['device'])
+    model = torch.load(
+        './transformer_models/model_round_2').to(config['device'])
     # optimizer = torch.optim.SGD().load_state_dict(config['optimizer_path'])
     loss = nn.CrossEntropyLoss()
     optimizer = torch.optim.SGD(model.parameters(), lr=config['lr'])
