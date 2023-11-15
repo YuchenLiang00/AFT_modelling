@@ -1,6 +1,5 @@
 import torch
 import time
-import json
 import psutil
 import os
 from torch import nn
@@ -46,7 +45,7 @@ def train(model: nn.Module,
             l.backward()
             optimizer.step()
 
-            _, y_hat = torch.max(pred, dim=1)
+            y_hat = pred.argmax(dim=1)
             epoch_train_acc.append((sum(y_hat == y) / len(y)).item())
             epoch_train_loss.append(l.item())
 
@@ -69,7 +68,7 @@ def train(model: nn.Module,
                 pred = model(X)
                 l = loss(pred, y)
                 epoch_valid_loss.append(l.item())
-                _, y_hat = torch.max(pred, dim=1)
+                y_hat = pred.argmax(dim=1)
                 epoch_valid_acc.append((sum(y_hat == y) / len(y)).item())
 
         valid_loss = sum(epoch_valid_loss) / len(epoch_valid_loss)
@@ -117,11 +116,10 @@ def train_Transformer() -> bool:
     # model.apply(initialize_weight)
 
     # load 模型重新训练
-    model = torch.load(
-        './transformer_models/model_round_2').to(config['device'])
+    model = torch.load('./transformer_models/model_round_3').to(config['device'])
     # optimizer = torch.optim.SGD().load_state_dict(config['optimizer_path'])
     loss = nn.CrossEntropyLoss()
-    optimizer = torch.optim.SGD(model.parameters(), lr=config['lr'])
+    optimizer = torch.optim.Adam(model.parameters(), lr=config['lr'], weight_decay=1e-5)
 
     train(model, train_iter, valid_iter, loss, optimizer, config)
     return True
