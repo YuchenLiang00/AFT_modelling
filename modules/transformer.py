@@ -1,7 +1,6 @@
-from turtle import forward
 import torch
 import math
-from torch import nn
+from torch import dropout, nn
 
 '''
 Stock Embeddings: If using a single model, 
@@ -57,52 +56,11 @@ class PositionalEncoding(nn.Module):
         return self.dropout(X)
 
 
-class MultiHeadAttention(nn.Module):
-
-    def __init__(self, d_model, num_heads):
-        super(MultiHeadAttention, self).__init__()
-        self.num_heads = num_heads
-        self.d_model = d_model
-        self.depth = int(d_model / num_heads)
-
-        self.W_Q = nn.Linear(d_model, d_model)
-        self.W_K = nn.Linear(d_model, d_model)
-        self.W_V = nn.Linear(d_model, d_model)
-        self.W_O = nn.Linear(d_model, d_model)
-
-    def forward(self, Q, K, V):
-        Q = self.W_Q(Q)
-        K = self.W_K(K)
-        V = self.W_V(V)
-
-        Q = self._split_heads(Q)
-        K = self._split_heads(K)
-        V = self._split_heads(V)
-
-        attention_weights = torch.matmul(Q, K.transpose(-1, -2)) / torch.sqrt(
-            torch.tensor(self.depth, dtype=torch.float32))
-        attention_weights = torch.softmax(attention_weights, dim=-1)
-
-        output = torch.matmul(attention_weights, V)
-        output = self._combine_heads(output)
-
-        output = self.W_O(output)
-        return output
-
-    def _split_heads(self, tensor):
-        tensor = tensor.view(tensor.size(0), -1, self.num_heads, self.depth)
-        return tensor.transpose(1, 2)
-
-    def _combine_heads(self, tensor):
-        tensor = tensor.transpose(1, 2).contiguous()
-        tensor = tensor.view(tensor.size(0), -1, self.num_heads * self.depth)
-        return tensor
-
-
 class EncoderLayer(nn.Module):
 
-    def __init__(self, d_model, num_heads):
+    def __init__(self, d_model, num_heads, dropout):
         super(EncoderLayer, self).__init__()
+        self.dropout = nn.Dropout(dropout)  # TODO dropout 层，想加上，但是现在先算了
         self.attention = nn.MultiheadAttention(d_model, num_heads)
         self.feedforward = nn.Sequential(nn.Linear(d_model, 4 * d_model),
                                          nn.ReLU(),
@@ -119,77 +77,6 @@ class EncoderLayer(nn.Module):
         return output
 
 
-class DecoderLayer(nn.Module):
-
-    def __init__(self, d_model, num_heads):
-        super(DecoderLayer, self).__init__()
-        self.self_attention = nn.MultiheadAttention(
-            d_model, num_heads)  # TODO mask
-        self.encoder_attention = nn.MultiheadAttention(d_model, num_heads)
-        self.feedforward = nn.Sequential(nn.Linear(d_model, 4 * d_model),
-                                         nn.ReLU(),
-                                         nn.Linear(4 * d_model, d_model))
-        self.norm1 = nn.LayerNorm(d_model)
-        self.norm2 = nn.LayerNorm(d_model)
-        self.norm3 = nn.LayerNorm(d_model)
-
-    def forward(self, x, encoder_output):
-        self_attention_output = self.self_attention(x, x, x)[0]
-        self_attention_output = self.norm1(x + self_attention_output)
-
-        encoder_attention_output = self.encoder_attention(
-            self_attention_output, encoder_output, encoder_output)[0]
-        encoder_attention_output = self.norm2(self_attention_output +
-                                              encoder_attention_output)
-
-        feedforward_output = self.feedforward(encoder_attention_output)
-        output = self.norm3(encoder_attention_output + feedforward_output)
-        return output
-
-
-class Transformer(nn.Module):
-
-    def __init__(self, config: dict):
-        super(Transformer, self).__init__()
-        self.config = config
-        self.pe = PositionalEncoding(config['hidden_dim'], config['dropout'])
-        self.input_layer = nn.Linear(config['input_dim'], config['hidden_dim'])
-
-        self.encoder_layers = nn.ModuleList([
-            EncoderLayer(config['hidden_dim'], config['num_heads'])
-            for _ in range(config['num_layers'])
-        ])
-        self.decoder_layers = nn.ModuleList([
-            DecoderLayer(config['hidden_dim'], config['num_heads'])
-            for _ in range(config['num_layers'])
-        ])
-        self.output_layer = nn.Linear(
-            config['hidden_dim'], config['output_dim'])
-
-    def forward(self, x):
-
-        # Input layer
-        x = self.feature_norm(x)
-        x = self.input_layer(x)
-        x = self.pe(x) if self.config['pos_enco'] is True else x
-
-        # Encoder layers
-        # encoder_output = x.transpose(0, 1)
-        encoder_output = x
-        for layer in self.encoder_layers:
-            encoder_output = layer(encoder_output)
-
-        # Decoder layers
-        # decoder_output = encoder_output[-1, :, :].unsqueeze(0)
-        decoder_output = encoder_output
-        for layer in self.decoder_layers:
-            decoder_output = layer(decoder_output, encoder_output)
-
-        # Output layer
-        output = self.output_layer(decoder_output)
-        return output
-
-
 class TransformerClassifier(nn.Module):
     """
     TransformerClassifier 的输入维度应该是(batch_size, seq_len, embed_size)
@@ -200,9 +87,10 @@ class TransformerClassifier(nn.Module):
         super(TransformerClassifier, self).__init__()
         self.config = config
         self.feature_norm = FeatureNorm()
+        
         self.pe = PositionalEncoding(config['hidden_dim'], config['dropout'])
         self.encoder_layers = nn.ModuleList([
-            EncoderLayer(config['hidden_dim'], config['num_heads'])
+            EncoderLayer(config['hidden_dim'], config['num_heads'], config['dropout'])
             for _ in range(config['num_layers'])
         ])
 

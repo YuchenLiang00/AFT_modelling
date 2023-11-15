@@ -19,19 +19,24 @@ def count_parameters(model):
     return sum(p.numel() for p in model.parameters() if p.requires_grad is True)
 
 
-def plot_loss(train_losses: list, valid_losses: list):
+def plot_loss(train_losses: list, valid_losses: list,
+              train_accs:list, valid_accs:list):
     """ 绘制损失函数、精度图线 """
     # TODO 绘制测试精度
+
     fig, ax = plt.subplots(1)
-    ax.plot(train_losses)
-    ax.plot(valid_losses)
-    ax.legend(['train_loss', 'valid_loss'])
-    ax.set_title('Losses of Train and Valid')
+    ax.plot(train_losses,'-')
+    ax.plot(valid_losses,'-')
+    ax.plot(train_accs,'-.')
+    ax.plot(valid_accs,'m-.')
+    ax.legend(['train_loss', 'valid_loss','train_accs', 'valid_accs'])
+    ax.set_title('Losses and Accuracies')
     plt.xlabel('epochs')
-    plt.ylabel('loss')
-    plt.xlim(0, len(train_losses))
-    
-    plt.ylim(0, 1)
+    plt.grid()
+    # ax.set_title('Accuracies')
+    # plt.xlabel('epochs')
+ 
+
     str_now = datetime.now().strftime('%Y%m%d_%H%M%S')
     plt.savefig(f'./figures/Figure_{str_now}.png')
 
@@ -48,6 +53,8 @@ def save_log(**kwargs):
 
 
 if __name__ == '__main__':
-    d = {1: 'abs', 2: 'cde'}
-    e = {'Anna': 23, 'Logan': 36}
-    save_log(d=d, e=e)
+    a = [1,2,3,4]
+    b = [2,3,4,5]
+    c = [10, 9 ,8 ,7]
+    d = [10,9,9,8]
+    plot_loss(a,b,c,d)
