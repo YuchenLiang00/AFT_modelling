@@ -1,20 +1,20 @@
 config: dict = {
     'device': 'mps',
     'seq_len': 300,  # 这是最重要的指标之一
-    'stride': 10,
-    'batch_size': 32,
+    'batch_size': 256,  # batch_size 过小可能导致损失曲线震荡
     'train_days': 50,
-    'hidden_dim': 426,  # = embed_size（自注意力） = feature_size（本题无需embedding）
+    'input_dim': 426,  # = embed_size（自注意力） = feature_size（本题无需embedding）
+    'hidden_dim': 64,
     'daily_secs': 3998,
     'dropout': .1,
     'output_dim': 3,
     'num_heads': 2,
     'num_layers': 2,
-    'pos_enco': True,
-    'lr': 2 * 1e-5,
-    'num_epochs': 20,
-    'model_path': './transformer_models/model_round_4',
-    'optimizer_path': './transformer_models/optimizer_round_4'
+    'lr': 2 * 1e-4,  # 学习率过大可能导致学习率震荡
+    'weight_decay': 5e-3,
+    'num_epochs': 10,
+    'model_path': './transformer_models/model_round_0',
+    'optimizer_path': './transformer_models/optimizer_round_0'
 }
 
 '''

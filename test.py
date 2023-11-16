@@ -1,5 +1,6 @@
 # 二进制快速幂
 from numba import jit, int32
+import torch
 import time
 
 MOD = 1000000007
@@ -49,5 +50,46 @@ def bit_wise_cal():
     elapsed = end - start
     print(f"Elapsed time: {elapsed} seconds.")
 
+def test_shape():
+    a = torch.randn(10000)
+    N = 10000
+    t1 = time.perf_counter()
+    for i in range(N):
+        m = len(a)
+    t2 = time.perf_counter()
+    for i in range(N):
+        n = a.shape[0]
+    t3 = time.perf_counter()
+    print(t2 - t1)
+    print(t3 - t2)
+
+def test_eq():
+    a = torch.randn(1000)
+    b = torch.randn(1000)
+    N = 1000
+    t1 = time.perf_counter()
+    for i in range(N):
+        m = (a == b).sum()
+    t2 = time.perf_counter()
+    for i in range(N):
+        n = sum(a == b)
+    t3 = time.perf_counter()    
+    print(t2 - t1)
+    print(t3 - t2)
+
+def test_mean():
+    a = torch.randn(1000)
+    b = torch.randn(1000)
+    N = 10000
+    t1 = time.perf_counter()
+    for i in range(N):
+        m = (a==b).sum() / a.shape[0]
+    t2 = time.perf_counter()
+    for i in range(N):
+        n = (a==b).float().mean()
+    t3 = time.perf_counter()
+    print(t2 - t1)
+    print(t3 - t2)
+
 if __name__ == '__main__':
-    bit_wise_cal()
+    test_mean()

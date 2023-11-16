@@ -20,16 +20,13 @@ class FeatureNorm(nn.Module):
         # X (batch_size, seq_len, feature_num)
         # Ensure no gradients are computed for the mean and std
         with torch.no_grad():
-            mean = X.nanmean(dim=[0, 1], keepdim=True)
-            X = X - mean
-            X.nan_to_num_(nan=0)
-            std = X.std(dim=[0, 1], keepdim=True)
+            X -= X.nanmean(dim=[0, 1], keepdim=True)
+            X.nan_to_num_(nan=0) # replace nan to 0
+            # Normalize the tensor
+            # Adding a small constant to avoid division by zero
+            X /= X.std(dim=[0, 1], keepdim=True) + 1e-6
 
-        # Normalize the tensor
-        # Adding a small constant to avoid division by zero
-        normalized_x = X / (std + 1e-6)
-        
-        return normalized_x
+        return X
     
     def _internalize_outliers(self, X):
         # TODO deal with out liers
@@ -40,6 +37,9 @@ class FeatureNorm(nn.Module):
 class PositionalEncoding(nn.Module):
 
     def __init__(self, d_model, dropout, max_len=1000):
+        """ parameters:
+        max_len: max seq len allowed to encoding
+        """
         super(PositionalEncoding, self).__init__()
         self.dropout = nn.Dropout(dropout)
         # 创建⼀个⾜够⻓的P
@@ -58,10 +58,11 @@ class PositionalEncoding(nn.Module):
 
 class EncoderLayer(nn.Module):
 
-    def __init__(self, d_model, num_heads, dropout):
+    def __init__(self, d_model, num_heads,drop_out):
         super(EncoderLayer, self).__init__()
-        self.dropout = nn.Dropout(dropout)  # TODO dropout 层，想加上，但是现在先算了
         self.attention = nn.MultiheadAttention(d_model, num_heads)
+        self.dropout = nn.Dropout(drop_out)  
+        # TODO dropout 层，应该在ff层加上，可以有效对抗过拟合，但是现在先算了
         self.feedforward = nn.Sequential(nn.Linear(d_model, 4 * d_model),
                                          nn.ReLU(),
                                          nn.Linear(4 * d_model, d_model))
@@ -72,7 +73,7 @@ class EncoderLayer(nn.Module):
         attention_output = self.attention(x, x, x)[0]
         attention_output = self.norm1(x + attention_output)
 
-        feedforward_output = self.feedforward(attention_output)
+        feedforward_output = self.dropout(self.feedforward(attention_output))
         output = self.norm2(attention_output + feedforward_output)
         return output
 
@@ -87,23 +88,25 @@ class TransformerClassifier(nn.Module):
         super(TransformerClassifier, self).__init__()
         self.config = config
         self.feature_norm = FeatureNorm()
-        
+        # TODO 
+        self.dropout = nn.Dropout(config['dropout'])
+        self.input_layer = nn.Linear(config['input_dim'], config['hidden_dim'])
         self.pe = PositionalEncoding(config['hidden_dim'], config['dropout'])
         self.encoder_layers = nn.ModuleList([
             EncoderLayer(config['hidden_dim'], config['num_heads'], config['dropout'])
-            for _ in range(config['num_layers'])
-        ])
+            for _ in range(config['num_layers'])])
 
-        self.fc = nn.Linear(config['hidden_dim'] *
-                            config['seq_len'], config['output_dim'])
+        self.fc = nn.Linear(config['hidden_dim'] * config['seq_len'],
+                            config['output_dim'])
 
     def forward(self, X):
         """ X: (batch_size, seq_len, feature_size) """
         # Feature-wise Normalization
         X = self.feature_norm(X)
+        X = self.dropout(self.input_layer(X))
 
         # Positional Encoding
-        X = self.pe(X) if self.config['pos_enco'] is True else X
+        X = self.pe(X)
 
         # Encoder layers
         encoder_output = X  # 不会产生copy
@@ -112,8 +115,8 @@ class TransformerClassifier(nn.Module):
         # encoder_output: (batch_size, seq_len, hidden_size=embed_size=feature_size)
 
         # Output layer
-        output = self.fc(encoder_output.flatten(
-            start_dim=1))  # 将seq_len, feature_size展平
+        # 将seq_len, feature_size展平
+        output = self.fc(encoder_output.flatten(start_dim=1))  
         # output: (batch_size, class_num), 在本例中，class_num = 3
         return output
 

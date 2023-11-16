@@ -19,24 +19,27 @@ def train(model: nn.Module,
           config: dict):
     num_params = count_parameters(model)
     print(f'On {config["device"]} : {num_params} parameters to train...')
-    train_losses = []
-    valid_losses = []
-    train_accs = []
-    valid_accs = []
-    best_valid_loss = 1e10
+
+    valid_len = len(valid_loader)
+    train_len = len(train_loader)
+    train_losses = torch.zeros(config['num_epochs']) + 1e8
+    valid_losses = torch.zeros(config['num_epochs']) + 1e8
+    train_accs = torch.zeros(config['num_epochs'])
+    valid_accs = torch.zeros(config['num_epochs'])
+    best_valid_loss = 1e8
     mem_usage = dict()
     process = psutil.Process(os.getpid())
 
-    t1 = time.time()
+    t1 = time.perf_counter()
 
     for epoch in tqdm(range(config['num_epochs']), desc='Epochs'):
         # training
         model.train()  # Turn on the Training Mode
-        epoch_train_loss = []
-        epoch_train_acc = []
-        for X, y in tqdm(train_loader, desc='Processing Train'):
+        epoch_train_loss = torch.zeros(train_len) + 1e8
+        epoch_train_acc = torch.zeros(train_len)
+        for i, (X, y) in enumerate(tqdm(train_loader, desc='Processing Train')):
             X = X.to(config['device'])
-            y = y.to(config['device'])  # 只要一个标签就可以
+            y = y.to(config['device'])
             # Compute prediction error
             optimizer.zero_grad()
             pred = model(X)
@@ -45,20 +48,25 @@ def train(model: nn.Module,
             l.backward()
             optimizer.step()
 
+            # 保存误差和精度
+            epoch_train_loss[i] = l.item()
             y_hat = pred.argmax(dim=1)
-            epoch_train_acc.append((sum(y_hat == y) / len(y)).item())
-            epoch_train_loss.append(l.item())
+            # epoch_train_acc.append((sum(y_hat == y) / y.shape[0]).item()) # 非常慢，时间消耗是下面的600倍
+            # epoch_train_acc[i] = ((y_hat == y).sum() / y.shape[0]).item() # 下面的更快，耗时是本条的78%
+            epoch_train_acc[i] = (y_hat == y).float().mean().item()
 
-        train_loss = sum(epoch_train_loss) / len(epoch_train_loss)
-        train_acc = sum(epoch_train_acc) / len(epoch_train_acc)
-        train_losses.append(train_loss)
-        train_accs.append(train_acc)
+
+        train_losses[epoch] = epoch_train_loss.mean()
+        train_accs[epoch] = epoch_train_acc.mean()
+
+        print(f"\nGPU Sleeping...")
+        time.sleep(300)  # Protect the GPU from over heating
 
         # validation
         model.eval()  # Trun on the Evaluation Mode
-        epoch_valid_loss = []
-        epoch_valid_acc = []
-        for X, y in tqdm(valid_loader, 'Processing Valid'):
+        epoch_valid_loss = torch.zeros(valid_len) + 1e8
+        epoch_valid_acc = torch.zeros(valid_len)
+        for i, (X, y) in enumerate(tqdm(valid_loader, 'Processing Valid')):
 
             # X, y = X.to(config['device']), y.to(config['device'])
             X = X.to(config['device'])
@@ -67,17 +75,15 @@ def train(model: nn.Module,
             with torch.no_grad():
                 pred = model(X)
                 l = loss(pred, y)
-                epoch_valid_loss.append(l.item())
+                epoch_valid_loss[i] = l.item()
                 y_hat = pred.argmax(dim=1)
-                epoch_valid_acc.append((sum(y_hat == y) / len(y)).item())
+                epoch_valid_acc[i] = (y_hat == y).float().mean().item()
 
-        valid_loss = sum(epoch_valid_loss) / len(epoch_valid_loss)
-        valid_losses.append(valid_loss)
-        valid_acc = sum(epoch_valid_acc) / len(epoch_valid_acc)
-        valid_accs.append(valid_acc)
+        valid_losses[epoch] = epoch_valid_loss.mean()
+        valid_accs[epoch] = epoch_valid_acc.mean()
 
-        if valid_loss < best_valid_loss:
-            best_valid_loss = valid_loss
+        if valid_losses[epoch] < best_valid_loss:
+            best_valid_loss = valid_losses[epoch]
             torch.save(model, config['model_path'])
             torch.save(optimizer.state_dict(), config['optimizer_path'])
         # Record memory usage
@@ -85,41 +91,46 @@ def train(model: nn.Module,
         # print(f"\nepoch:{epoch+1}, Mem Usage: {mem_usage[epoch+1]:.2f}, MB.")
 
         print(f"\nGPU Sleeping...")
-        time.sleep(300)  # Protect the GPU from over heating
+        time.sleep(60)  # Protect the GPU from over heating
 
-    t2 = time.time() - 300 * config['num_epochs']
+    t2 = time.perf_counter() - 360 * config['num_epochs']
     elapsed_time = (t2 - t1) / 60
-    save_log(train_losses=train_losses,
-             num_params=num_params,
-             valid_losses=valid_losses,
-             mem_usage=mem_usage,
-             config=config,
-             time_cost_mins=elapsed_time)
 
     print(f'Training Finished with Best Valid Loss: {best_valid_loss:.3f}')
     print(f'Total Time Cost: {elapsed_time:.2f} mins.')
 
-    plot_loss(train_losses, valid_losses, train_accs,
-              valid_accs)  # TODO绘制测试精度！！！！！
+    save_log(num_params=num_params,
+             train_losses=train_losses.tolist(),
+             valid_losses=valid_losses.tolist(),
+             train_accs=train_accs.tolist(),
+             valid_accs=valid_accs.tolist(),
+             mem_usage=mem_usage,
+             config=config,
+             time_cost_mins=elapsed_time)
+
+    plot_loss(train_losses, valid_losses, train_accs, valid_accs) 
 
     return True
 
 
 def train_Transformer() -> bool:
     train_iter = DataLoader(LOBDataset(is_train=True, config=config),
-                            shuffle=True, batch_size=config['batch_size'])
+                            shuffle=False, batch_size=config['batch_size'])
     valid_iter = DataLoader(LOBDataset(is_train=False, config=config),
                             shuffle=False, batch_size=config['batch_size'])
 
     # 如果是从头开始训练，则需要初始化，但是如果model是load进来的，则一定要去掉这句话。
-    # model = TransformerClassifier(config).to(config['device'])
-    # model.apply(initialize_weight)
+    model = TransformerClassifier(config).to(config['device'])
+    model.apply(initialize_weight)
 
-    # load 模型重新训练
-    model = torch.load('./transformer_models/model_round_3').to(config['device'])
+    # load 模型继续训练
+    # model = torch.load('./transformer_models/model_round_4').to(config['device'])
     # optimizer = torch.optim.SGD().load_state_dict(config['optimizer_path'])
     loss = nn.CrossEntropyLoss()
-    optimizer = torch.optim.Adam(model.parameters(), lr=config['lr'], weight_decay=1e-5)
+    optimizer = torch.optim.Adam(model.parameters(), lr=config['lr'], 
+                                 weight_decay=config['weight_decay'])
+    # optimizer.load_state_dict(torch.load('./transformer_models/optimizer_round_4'))
+   
 
     train(model, train_iter, valid_iter, loss, optimizer, config)
     return True
@@ -128,7 +139,4 @@ def train_Transformer() -> bool:
 if __name__ == '__main__':
 
     train_Transformer()
-    # model = TransformerClassifier(config)
-    # print(model)
-
     # pass

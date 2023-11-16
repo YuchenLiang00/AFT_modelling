@@ -6,6 +6,8 @@ import torch
 import json
 from torch.utils.data import DataLoader, Dataset
 
+""" dataset """
+
 """ 
 def __len__(self) -> int:
     # 返回的是训练集或验证集所有天的秒数和
@@ -167,3 +169,187 @@ class HisData:
             rdl = DataLoader(self.rtd, batch_size=self.batch_size)
             for data in rdl:
                 yield data[0], data[1]
+
+
+""" Transformer """
+
+class DecoderLayer(nn.Module):
+
+    def __init__(self, d_model, num_heads):
+        super(DecoderLayer, self).__init__()
+        self.self_attention = nn.MultiheadAttention(
+            d_model, num_heads)  # TODO mask
+        self.encoder_attention = nn.MultiheadAttention(d_model, num_heads)
+        self.feedforward = nn.Sequential(nn.Linear(d_model, 4 * d_model),
+                                         nn.ReLU(),
+                                         nn.Linear(4 * d_model, d_model))
+        self.norm1 = nn.LayerNorm(d_model)
+        self.norm2 = nn.LayerNorm(d_model)
+        self.norm3 = nn.LayerNorm(d_model)
+
+    def forward(self, x, encoder_output):
+        self_attention_output = self.self_attention(x, x, x)[0]
+        self_attention_output = self.norm1(x + self_attention_output)
+
+        encoder_attention_output = self.encoder_attention(
+            self_attention_output, encoder_output, encoder_output)[0]
+        encoder_attention_output = self.norm2(self_attention_output +
+                                              encoder_attention_output)
+
+        feedforward_output = self.feedforward(encoder_attention_output)
+        output = self.norm3(encoder_attention_output + feedforward_output)
+        return output
+
+
+class Transformer(nn.Module):
+
+    def __init__(self, config: dict):
+        super(Transformer, self).__init__()
+        self.config = config
+        self.pe = PositionalEncoding(config['hidden_dim'], config['dropout'])
+        self.input_layer = nn.Linear(config['input_dim'], config['hidden_dim'])
+
+        self.encoder_layers = nn.ModuleList([
+            EncoderLayer(config['hidden_dim'], config['num_heads'])
+            for _ in range(config['num_layers'])
+        ])
+        self.decoder_layers = nn.ModuleList([
+            DecoderLayer(config['hidden_dim'], config['num_heads'])
+            for _ in range(config['num_layers'])
+        ])
+        self.output_layer = nn.Linear(
+            config['hidden_dim'], config['output_dim'])
+
+    def forward(self, x):
+
+        # Input layer
+        x = self.feature_norm(x)
+        x = self.input_layer(x)
+        x = self.pe(x) if self.config['pos_enco'] is True else x
+
+        # Encoder layers
+        # encoder_output = x.transpose(0, 1)
+        encoder_output = x
+        for layer in self.encoder_layers:
+            encoder_output = layer(encoder_output)
+
+        # Decoder layers
+        # decoder_output = encoder_output[-1, :, :].unsqueeze(0)
+        decoder_output = encoder_output
+        for layer in self.decoder_layers:
+            decoder_output = layer(decoder_output, encoder_output)
+
+        # Output layer
+        output = self.output_layer(decoder_output)
+        return output
+
+
+class MultiHeadAttention(nn.Module):
+
+    def __init__(self, d_model, num_heads):
+        super(MultiHeadAttention, self).__init__()
+        self.num_heads = num_heads
+        self.d_model = d_model
+        self.depth = int(d_model / num_heads)
+
+        self.W_Q = nn.Linear(d_model, d_model)
+        self.W_K = nn.Linear(d_model, d_model)
+        self.W_V = nn.Linear(d_model, d_model)
+        self.W_O = nn.Linear(d_model, d_model)
+
+    def forward(self, Q, K, V):
+        Q = self.W_Q(Q)
+        K = self.W_K(K)
+        V = self.W_V(V)
+
+        Q = self._split_heads(Q)
+        K = self._split_heads(K)
+        V = self._split_heads(V)
+
+        attention_weights = torch.matmul(Q, K.transpose(-1, -2)) / torch.sqrt(
+            torch.tensor(self.depth, dtype=torch.float32))
+        attention_weights = torch.softmax(attention_weights, dim=-1)
+
+        output = torch.matmul(attention_weights, V)
+        output = self._combine_heads(output)
+
+        output = self.W_O(output)
+        return output
+
+    def _split_heads(self, tensor):
+        tensor = tensor.view(tensor.size(0), -1, self.num_heads, self.depth)
+        return tensor.transpose(1, 2)
+
+    def _combine_heads(self, tensor):
+        tensor = tensor.transpose(1, 2).contiguous()
+        tensor = tensor.view(tensor.size(0), -1, self.num_heads * self.depth)
+        return tensor
+
+
+""" data_preprocess """
+
+
+def load_all_data(file_path: str = None, filter: bool = False) -> bool:
+    '''将很多小的csv文件合并成一个大的文件'''
+
+    file_path = file_path if file_path is not None else './AI量化模型预测挑战赛公开数据/train/'
+    file_names = os.listdir(file_path)
+    if filter is True:
+        file_list, _ = filter_all_day_symbols(file_names)
+    else:
+        file_list = file_names
+
+    print('Loading Files ...')
+    df_list = []
+    for name in tqdm(file_list):
+        sub_df = pd.read_csv(file_path + name, index_col=0)
+        df_list.append(sub_df)
+
+    data = pd.concat(df_list, ignore_index=True)
+    data.sort_values(by=['date', 'time', 'sym'],
+                     inplace=True, ignore_index=True)
+
+    # 将时间的串转化成整数
+    data['time'] = data['time'].apply(
+        lambda x: int(time.mktime(time.strptime(x, '%H:%M:%S'))))
+    data['time'] -= data.at[0, 'time']
+    data = reduce_mem_usage(data)
+    return data
+
+
+def concat_data(features: pd.DataFrame, origin: pd.DataFrame) -> pd.DataFrame:
+    df = pd.merge(features, origin, how='inner', on=['date', 'time', 'sym'])
+    return df
+
+
+def save_data_seperate(df: pd.DataFrame, output_path: str = './data/'):
+    """ save data seperately """
+    df[df['date'] < config['train_days']
+       ].to_parquet(output_path + 'train_data.parquet')
+    df[df['date'] >= config['train_days']
+       ].to_parquet(output_path + 'valid_data.parquet')
+    return
+
+
+def gen_filename(stock_id, date_id, half_id):
+    return f"snapshot_sym{stock_id}_date{date_id}_{half_id}.csv"
+
+
+def filter_all_day_symbols(file_names: list) -> tuple[list, dict]:
+    """get file names of which a symbol hase both am and pm trading data"""
+
+    file_list = []
+    daily_sym_num_dict = dict()
+
+    for date in range(64):
+        daily_sym_num_dict[date] = 0
+        for sym in range(10):
+            am_name = gen_filename(sym, date, 'am')
+            pm_name = gen_filename(sym, date, 'pm')
+            if am_name in file_names and pm_name in file_names:
+                # 上下午的数据都有
+                daily_sym_num_dict[date] += 1
+                file_list.append(am_name)
+                file_list.append(pm_name)
+
+    return file_list, daily_sym_num_dict

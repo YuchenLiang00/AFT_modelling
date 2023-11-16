@@ -1,4 +1,5 @@
 from torch import nn
+import torch
 import matplotlib.pyplot as plt
 import json
 from datetime import datetime
@@ -19,8 +20,8 @@ def count_parameters(model):
     return sum(p.numel() for p in model.parameters() if p.requires_grad is True)
 
 
-def plot_loss(train_losses: list, valid_losses: list,
-              train_accs:list, valid_accs:list):
+def plot_loss(train_losses, valid_losses,
+              train_accs, valid_accs,):
     """ 绘制损失函数、精度图线 """
     # TODO 绘制测试精度
 
@@ -53,8 +54,8 @@ def save_log(**kwargs):
 
 
 if __name__ == '__main__':
-    a = [1,2,3,4]
-    b = [2,3,4,5]
-    c = [10, 9 ,8 ,7]
-    d = [10,9,9,8]
+    a = torch.tensor([1,2,3,4])
+    b = torch.tensor([2,3,4,5])
+    c = torch.tensor([10, 9 ,8 ,7])
+    d = torch.tensor([10,9,9,8])
     plot_loss(a,b,c,d)
