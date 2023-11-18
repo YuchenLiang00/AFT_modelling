@@ -24,7 +24,7 @@ class LOBDataset(Dataset):
         label_path = './data/train_labels.npy' if is_train is True else './data/valid_labels.npy'
         self.data: torch.Tensor = torch.from_numpy(np.load(data_path))
         self.label: torch.Tensor = torch.from_numpy(np.load(label_path))
-        # 选出对应的预测维度(stock_num, daily_sec)
+        # 选出对应的预测维度(stock_num, secs)
         self.label: torch.Tensor = self.label[:, :, pred_label]  # 这里的pred_label表示预测对象
         self.seq_len: int = config['seq_len']
 
@@ -39,9 +39,11 @@ class LOBDataset(Dataset):
         return X, y
 
 if __name__ == '__main__':
-
-    train_iter = DataLoader(LOBDataset(is_train=True, config=config), batch_size=64, shuffle=False)
-    print(train_iter)
+    config['seq_len'] = 1
+    dataset=LOBDataset(is_train=True, config=config)
+    train_iter = DataLoader(dataset, batch_size=256, shuffle=False)
+    # print(len(dataset))
 
     for i, batch in enumerate(tqdm(train_iter)):
-        pass
+        print(batch[0].shape)
+

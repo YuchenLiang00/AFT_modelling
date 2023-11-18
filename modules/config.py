@@ -9,11 +9,11 @@ config: dict = {
     'output_dim': 3,
     'num_heads': 2,
     'num_layers': 2,
-    'lr': 5 * 1e-5,  # 学习率过大可能导致学习率震荡
-    'weight_decay': 3 * 1e-5,
-    'num_epochs': 10,
-    'model_path': './model_output/model_round_1',
-    'optimizer_path': './model_output/optimizer_round_1'
+    'lr': 1 * 1e-5,  # 学习率过大可能导致学习率震荡
+    'weight_decay': 0,
+    'num_epochs': 20,
+    'model_path': './model_output/model_round_4',
+    'optimizer_path': './model_output/optimizer_round_4'
 }
 
 '''

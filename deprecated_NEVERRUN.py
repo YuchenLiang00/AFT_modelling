@@ -353,3 +353,16 @@ def filter_all_day_symbols(file_names: list) -> tuple[list, dict]:
                 file_list.append(pm_name)
 
     return file_list, daily_sym_num_dict
+
+
+def get_daily_sym_dict():
+    index: pd.DataFrame = pd.read_parquet(path='./data/all_data.parquet',
+                                          engine='fastparquet',
+                                          columns=['date', 'sym', 'time', 'morning'])
+    filtered_df: pd.DataFrame = filter_index(index)
+    group_df = filtered_df.groupby(by='date')
+    l = [len(sub_df['sym'].unique()) for (_, sub_df) in group_df]
+    acc = np.array(l).cumsum()
+    np.save('./data/cum_sym_num_dict.npy', acc)
+
+    return True

@@ -19,9 +19,9 @@ def cal_f1score(model,valid_iter: DataLoader):
     y_hat = torch.concatenate(y_hat_list).to('cpu').numpy()
     y = torch.concatenate(y_list).numpy()
     score = f1_score(y, y_hat, average='macro')
-    print(score)
+    print(f'macro F1-score = {score:.4f}')
     acc = (y == y_hat).mean()
-    print(acc)
+    print(f'acc={acc:.4%}')
     return score
 
 def test(valid_iter):
@@ -31,9 +31,10 @@ def test(valid_iter):
 
 
 if __name__ == '__main__':
-    model = torch.load('./transformer_models/model_round_4').to(config['device'])
-    valid_iter = DataLoader(LOBDataset(is_train=False, config=config, pred_label=0, require_stride=False), 
-                            batch_size=32, shuffle=False)
+    model = torch.load('./model_output/model_round_3').to(config['device'])
+    config['seq_len']=1
+    valid_iter = DataLoader(LOBDataset(is_train=False, config=config, pred_label=0), 
+                            batch_size=1024, shuffle=False)
     score = cal_f1score(model, valid_iter)
     # print(score)
     # test(valid_iter)

@@ -7,6 +7,7 @@ from tqdm import tqdm
 from torch.utils.data import DataLoader
 # -- Personal Modules --
 from modules.transformer import TransformerClassifier
+from modules.mlp import MLP
 from modules.config import config
 from dataset import LOBDataset
 from modules.functions import *
@@ -59,9 +60,6 @@ def train(model: nn.Module,
         train_losses[epoch] = epoch_train_loss.mean()
         train_accs[epoch] = epoch_train_acc.mean()
 
-        print(f"\nGPU Sleeping...")
-        time.sleep(300)  # Protect the GPU from over heating
-
         # validation
         model.eval()  # Trun on the Evaluation Mode
         epoch_valid_loss = torch.zeros(valid_len) + 1e8
@@ -90,10 +88,11 @@ def train(model: nn.Module,
         mem_usage[epoch+1] = process.memory_full_info().uss / (1024 * 1024)
         # print(f"\nepoch:{epoch+1}, Mem Usage: {mem_usage[epoch+1]:.2f}, MB.")
 
-        print(f"\nGPU Sleeping...")
-        time.sleep(60)  # Protect the GPU from over heating
+        # print(f"\nGPU Sleeping...")
+        # time.sleep(0)  # Protect the GPU from over heating
 
-    t2 = time.perf_counter() - 360 * config['num_epochs']
+    # t2 = time.perf_counter() - 0 * config['num_epochs']
+    t2 = time.perf_counter()
     elapsed_time = (t2 - t1) / 60
 
     print(f'Training Finished with Best Valid Loss: {best_valid_loss:.3f}')
@@ -115,7 +114,7 @@ def train(model: nn.Module,
 
 def train_Transformer() -> bool:
     train_iter = DataLoader(LOBDataset(is_train=True, config=config),
-                            shuffle=False, batch_size=config['batch_size'])
+                            shuffle=True, batch_size=config['batch_size'])
     valid_iter = DataLoader(LOBDataset(is_train=False, config=config),
                             shuffle=False, batch_size=config['batch_size'])
 
@@ -124,19 +123,36 @@ def train_Transformer() -> bool:
     model.apply(initialize_weight)
 
     # load 模型继续训练
-    # model = torch.load('./transformer_models/model_round_4').to(config['device'])
+    # model = torch.load('./model_output/model_round_0').to(config['device'])
     # optimizer = torch.optim.SGD().load_state_dict(config['optimizer_path'])
     loss = nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=config['lr'], 
                                  weight_decay=config['weight_decay'])
-    # optimizer.load_state_dict(torch.load('./transformer_models/optimizer_round_4'))
+    # optimizer.load_state_dict(torch.load('./model_output/optimizer_round_0'))
    
 
     train(model, train_iter, valid_iter, loss, optimizer, config)
     return True
 
 
+def train_MLP():
+    config['seq_len'] = 1
+    config['batch_size'] = 1024
+    config['num_epochs'] = 10
+    train_iter = DataLoader(LOBDataset(is_train=True, config=config),
+                            shuffle=True, batch_size=config['batch_size'])
+    valid_iter = DataLoader(LOBDataset(is_train=False, config=config),
+                            shuffle=False, batch_size=config['batch_size'])
+    model = MLP(config).to(config['device'])
+    optimizer = torch.optim.Adam(model.parameters(), lr=1e-3,)
+    loss = nn.CrossEntropyLoss()
+    train(model, train_iter, valid_iter, loss, optimizer, config)
+    return True
+
+
+
 if __name__ == '__main__':
 
-    train_Transformer()
+    # train_Transformer()
+    train_MLP()
     # pass

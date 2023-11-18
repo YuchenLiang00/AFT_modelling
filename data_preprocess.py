@@ -7,6 +7,7 @@ from tqdm import tqdm
 from modules.config import config
 from modules.compress import reduce_mem_usage
 
+
 def df2array3(df: pd.DataFrame) -> np.ndarray:
     """
     将二维的dataframe转为三维的numpy数组
@@ -23,12 +24,18 @@ def df2array3(df: pd.DataFrame) -> np.ndarray:
     return array_3d
 
 
-def export_data(df: pd.DataFrame,index:pd.Index) -> bool:
+def export_data(df: pd.DataFrame,
+                sym: pd.Series, morning: pd.Series) -> bool:
     """ 将df转化为numpy数组并存储 """
     # df = reduce_mem_usage(df)
     # df.to_parquet('./data/compressed_all_data.parquet', engine='fastparquet')
     # gc.collect()
-    df = df.loc[index, :]
+    df.sort_values(by=['date', 'sym', 'time'],
+                   ignore_index=True, inplace=True)
+    df['sym'] = sym
+    afternoon_stamp: int = df.loc[morning == 0, 'time'].iloc[0]
+
+    df.loc[morning == 0, 'time'] -= afternoon_stamp
     feature_names = df.columns.to_list()  # len: 434
     # 这里包含time,date,sym,feature1,feature2,...,featuren,label1,...,labeln
 
@@ -44,10 +51,11 @@ def export_data(df: pd.DataFrame,index:pd.Index) -> bool:
     train_data_list, train_label_list = [], []
     valid_data_list, valid_label_list = [], []  # 这是一种极其消耗内存的方法
 
-    for date in range(config['train_days']):
-        indexes = df[df['date'] == date].index  # 避免算两次
-        arr_features = df2array3(df.loc[indexes, ['time','sym'] + feature_names])
-        arr_labels = df2array3(df.loc[indexes,['time', 'sym'] + label_names])
+    for date in tqdm(range(config['train_days'])):
+        indexes = (df['date'] == date)  # 避免算两次
+        arr_features = df2array3(
+            df.loc[indexes, ['time', 'sym'] + feature_names])
+        arr_labels = df2array3(df.loc[indexes, ['time', 'sym'] + label_names])
         train_data_list.append(arr_features)
         train_label_list.append(arr_labels)
         gc.collect()
@@ -63,9 +71,10 @@ def export_data(df: pd.DataFrame,index:pd.Index) -> bool:
     del train_label, train_label_list
     gc.collect()
 
-    for date in range(config['train_days'], 64):
+    for date in tqdm(range(config['train_days'], 64)):
         indexes = df[df['date'] == date].index
-        arr_features = df2array3(df.loc[indexes, ['time', 'sym'] + feature_names])
+        arr_features = df2array3(
+            df.loc[indexes, ['time', 'sym'] + feature_names])
         arr_labels = df2array3(df.loc[indexes, ['time', 'sym'] + label_names])
         valid_data_list.append(arr_features)
         valid_label_list.append(arr_labels)
@@ -83,55 +92,30 @@ def export_data(df: pd.DataFrame,index:pd.Index) -> bool:
     return True
 
 
-def filter_index(index_df: pd.DataFrame) -> pd.DataFrame:
-    """ 返回上下午都有值的股票的index """
-
-    # print(index_df.shape)  # (2448775, 4)
-    m1: np.ndarray = index_df[index_df['morning'] == 1].loc[:, ['date','sym']].values
-    m0: np.ndarray = index_df[index_df['morning'] == 0].loc[:, ['date','sym']].values
-    m1_set = set(map(tuple, m1))
-    m0_set = set(map(tuple, m0))
-    xor_set = m1_set ^ m0_set  # 存储了不同时在m1_set 和 m0_set中的(date, sym)元组
-    # bool_series 中，False表示不应被去除的股票。标记为True，则表示应该被去掉
-    bool_series = pd.Series(data=[False] * index_df.shape[0])
-
-    for date, sym in xor_set:
-        bool_series |= (index_df['date'] == date) & (index_df['sym'] == sym)
-        # print(sum(bool_series == True))
-    index_df = index_df[~bool_series]
-    # print(index_df.shape)  # (2406796, 4)
-    return index_df
+def combine_index(index_df: pd.DataFrame) -> pd.DataFrame:
+    """ 合并sym和morning """
+    index_df.sort_values(by=['date','sym','time'],
+                         ignore_index=True, inplace=True)
+    index_df['sym'] = index_df['sym'].astype('str')
+    index_df['sym'] = index_df['sym'].str.cat(
+        index_df['morning'].astype('str'), sep='_')
+    return index_df['sym'], index_df['morning']
 
 
 def main():
     index: pd.DataFrame = pd.read_parquet(path='./data/all_data.parquet',
-                           engine='fastparquet',
-                           columns=['date', 'sym','time', 'morning'])
-    filtered_index: pd.Index = filter_index(index).index
+                                          engine='fastparquet',
+                                          columns=['date', 'sym', 'time', 'morning'])
+    sym, morning = combine_index(index)
     del index
     gc.collect()
-
     data: pd.DataFrame = pd.read_parquet(path='./data/compressed_all_data.parquet',
                                          engine='fastparquet')
-
-    export_data(data, filtered_index)
+    export_data(data, sym, morning)
     print('OK')
     return True
 
 
-def get_daily_sym_dict():
-    index: pd.DataFrame = pd.read_parquet(path='./data/all_data.parquet',
-                           engine='fastparquet',
-                           columns=['date', 'sym','time', 'morning'])
-    filtered_df: pd.DataFrame = filter_index(index)
-    group_df = filtered_df.groupby(by='date')
-    l = [len(sub_df['sym'].unique()) for (_, sub_df) in group_df]
-    acc = np.array(l).cumsum()
-    np.save('./data/cum_sym_num_dict.npy', acc)
-
-    return True
-
 if __name__ == '__main__':
 
     main()
-    # get_daily_sym_dict()

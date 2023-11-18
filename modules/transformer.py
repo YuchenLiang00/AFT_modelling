@@ -89,7 +89,8 @@ class TransformerClassifier(nn.Module):
         self.config = config
         self.feature_norm = FeatureNorm()
         # TODO 
-        self.dropout = nn.Dropout(config['dropout'])
+        self.dropout1 = nn.Dropout(config['dropout'])
+        self.dropout2 = nn.Dropout(config['dropout'])
         self.input_layer = nn.Linear(config['input_dim'], config['hidden_dim'])
         self.pe = PositionalEncoding(config['hidden_dim'], config['dropout'])
         self.encoder_layers = nn.ModuleList([
@@ -103,7 +104,7 @@ class TransformerClassifier(nn.Module):
         """ X: (batch_size, seq_len, feature_size) """
         # Feature-wise Normalization
         X = self.feature_norm(X)
-        X = self.dropout(self.input_layer(X))
+        X = self.dropout1(self.input_layer(X))
 
         # Positional Encoding
         X = self.pe(X)
@@ -116,7 +117,7 @@ class TransformerClassifier(nn.Module):
 
         # Output layer
         # 将seq_len, feature_size展平
-        output = self.fc(encoder_output.flatten(start_dim=1))  
+        output = self.dropout2(self.fc(encoder_output.flatten(start_dim=1)))
         # output: (batch_size, class_num), 在本例中，class_num = 3
         return output
 
