@@ -8,6 +8,7 @@ class MLP(nn.Module):
         self.input_layer = nn.Linear(config['input_dim'], config['hidden_dim'])
         self.relu = nn.ReLU()
         self.dropout1 = nn.Dropout(config['dropout'])
+        # TODO linear to add dropout
         self.hidden_layers = nn.Sequential(nn.Linear(config['hidden_dim'], config['hidden_dim']),
                                            nn.ReLU(),
                                            nn.Linear(config['hidden_dim'], config['hidden_dim']),
@@ -23,7 +24,7 @@ class MLP(nn.Module):
         return output
     
     def _feature_norm(self, X):
-        X -= X.nanmean(dim=[0, 1], keepdim=True)
+        X -= X.nanmean(dim=[0, 1], keepdim=True) # 0 or 1, not both.
         X.nan_to_num_(nan=0) # replace nan to 0
         # Normalize the tensor
         # Adding a small constant to avoid division by zero

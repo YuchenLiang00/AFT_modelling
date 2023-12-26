@@ -117,7 +117,8 @@ def train_Transformer() -> bool:
                             shuffle=True, batch_size=config['batch_size'])
     valid_iter = DataLoader(LOBDataset(is_train=False, config=config),
                             shuffle=False, batch_size=config['batch_size'])
-
+    weight = 1.0 / torch.tensor([424085, 1067807, 417153],dtype=torch.float32)
+    weight /= weight.sum()
     # 如果是从头开始训练，则需要初始化，但是如果model是load进来的，则一定要去掉这句话。
     model = TransformerClassifier(config).to(config['device'])
     model.apply(initialize_weight)
@@ -125,7 +126,7 @@ def train_Transformer() -> bool:
     # load 模型继续训练
     # model = torch.load('./model_output/model_round_0').to(config['device'])
     # optimizer = torch.optim.SGD().load_state_dict(config['optimizer_path'])
-    loss = nn.CrossEntropyLoss()
+    loss = nn.CrossEntropyLoss(weight)
     optimizer = torch.optim.Adam(model.parameters(), lr=config['lr'], 
                                  weight_decay=config['weight_decay'])
     # optimizer.load_state_dict(torch.load('./model_output/optimizer_round_0'))
@@ -144,8 +145,10 @@ def train_MLP():
     valid_iter = DataLoader(LOBDataset(is_train=False, config=config),
                             shuffle=False, batch_size=config['batch_size'])
     model = MLP(config).to(config['device'])
-    optimizer = torch.optim.Adam(model.parameters(), lr=1e-3,)
-    loss = nn.CrossEntropyLoss()
+    weight = 1.0 / torch.tensor([424085, 1067807, 417153],dtype=torch.float32)
+    weight /= weight.sum()
+    optimizer = torch.optim.Adam(model.parameters(), lr=1e-4,)
+    loss = nn.CrossEntropyLoss(weight.to(config['device']))
     train(model, train_iter, valid_iter, loss, optimizer, config)
     return True
 

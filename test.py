@@ -1,10 +1,14 @@
 # 二进制快速幂
-from numba import jit, int32
-import torch
+import numba
+# import torch
 import time
+import math
+
+import numpy
 
 MOD = 1000000007
 REPEAT = 10000
+
 
 def timeit(times):
     def repeat(func):
@@ -18,7 +22,8 @@ def timeit(times):
         return wrapper
     return repeat
 
-@jit(int32(int32, int32),nopython=True, cache=True)
+
+# @jit(int32(int32, int32), nopython=True, cache=True)
 def fast_pow(base: int, exp: int):
     ans = 1
     while exp > 0:
@@ -30,7 +35,8 @@ def fast_pow(base: int, exp: int):
 
 
 def my_pow(a, n):
-    return pow(a, n,MOD)
+    return pow(a, n, MOD)
+
 
 def bit_wise_cal():
     size = 100000000  # 100 million
@@ -50,6 +56,7 @@ def bit_wise_cal():
     elapsed = end - start
     print(f"Elapsed time: {elapsed} seconds.")
 
+
 def test_shape():
     a = torch.randn(10000)
     N = 10000
@@ -63,6 +70,7 @@ def test_shape():
     print(t2 - t1)
     print(t3 - t2)
 
+
 def test_eq():
     a = torch.randn(1000)
     b = torch.randn(1000)
@@ -73,9 +81,10 @@ def test_eq():
     t2 = time.perf_counter()
     for i in range(N):
         n = sum(a == b)
-    t3 = time.perf_counter()    
+    t3 = time.perf_counter()
     print(t2 - t1)
     print(t3 - t2)
+
 
 def test_mean():
     a = torch.randn(1000)
@@ -83,13 +92,59 @@ def test_mean():
     N = 10000
     t1 = time.perf_counter()
     for i in range(N):
-        m = (a==b).sum() / a.shape[0]
+        m = (a == b).sum() / a.shape[0]
     t2 = time.perf_counter()
     for i in range(N):
-        n = (a==b).float().mean()
+        n = (a == b).float().mean()
     t3 = time.perf_counter()
     print(t2 - t1)
     print(t3 - t2)
 
+
+def test_sort():
+    N = 10000
+    t1 = time.perf_counter()
+    for i in range(N):
+        a = torch.randn(1000).tolist()
+        m = a.sort()
+    t2 = time.perf_counter()
+    for i in range(N):
+        a = torch.randn(1000).tolist()
+        n = sorted(a)
+    t3 = time.perf_counter()
+    print(t2 - t1)
+    print(t3 - t2)  # 几乎无差别
+
+
+def test_bit():
+    N = 1_000_000
+    t1 = time.perf_counter()
+    a = 0b10001000_00000000_01001011_00100101
+    _quo = 2 ** 12
+    for i in range(N):
+        b = a >> 12
+    t2 = time.perf_counter()
+    for i in range(N):
+        b = a // _quo
+    t3 = time.perf_counter()
+    print(t2 - t1)
+    print(t3 - t2)  # 几乎无差别
+
+# @numba.njit(nopython=True)
+def test_numba(number):
+    # t1 = time.perf_counter()
+    sqrt_number = int(numpy.sqrt(number))+ 1
+    for i in range(2, sqrt_number):
+        if number % i  == 0:
+            return False
+    # t2 = time.perf_counter()
+    # print(t2 - t1)
+    return True
+
+
+
+    
+
+
 if __name__ == '__main__':
-    test_mean()
+    test_numba(10000019)
